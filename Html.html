@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Oracle คืออะไร?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#101812;
+    --accent:#4ADE80;
+    --bg:#162019;
+    --soft:#223027;
+    --ink:#101812;
+    --muted:#5d6e63;
+    --light:#F1FAF4;
+    --line:#DCEFE2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Kanit',sans-serif;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(74,222,128,.10), transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(74,222,128,.08), transparent 45%),
+      var(--bg);
+    overflow:hidden;color:var(--ink);
+  }
+
+  /* ---------- Stage 16:9 ---------- */
+  .stage{
+    position:absolute;left:50%;top:calc(50% - 22px);
+    width:1280px;height:720px;
+    transform:translate(-50%,-50%) scale(var(--s,1));
+  }
+  .slide{
+    position:absolute;inset:0;
+    background:#fff;border-radius:30px;
+    box-shadow:0 20px 50px rgba(0,0,0,.30),0 2px 6px rgba(0,0,0,.12);
+    padding:78px 64px 60px;
+    opacity:0;visibility:hidden;overflow:hidden;
+    transition:opacity .35s ease;
+  }
+  .slide.active{opacity:1;visibility:visible}
+  .slide::before{ /* dotted pattern */
+    content:"";position:absolute;top:0;right:0;width:260px;height:180px;
+    background-image:radial-gradient(#cfe9d7 1.6px,transparent 1.6px);
+    background-size:18px 18px;opacity:.7;
+    mask-image:linear-gradient(225deg,#000 20%,transparent 75%);
+    -webkit-mask-image:linear-gradient(225deg,#000 20%,transparent 75%);
+  }
+  .slide::after{ /* soft glow */
+    content:"";position:absolute;right:-120px;bottom:-140px;width:360px;height:360px;border-radius:50%;
+    background:radial-gradient(circle,rgba(74,222,128,.18),transparent 70%);pointer-events:none;
+  }
+
+  /* ---------- Common parts ---------- */
+  .tag{
+    position:absolute;top:26px;left:32px;z-index:2;
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:14px;font-weight:600;letter-spacing:.5px;
+    padding:6px 14px 6px 10px;border-radius:999px;
+    background:var(--primary);color:var(--accent);
+  }
+  .tag::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(74,222,128,.25)}
+  .pnum{
+    position:absolute;bottom:22px;right:32px;z-index:2;
+    font-size:15px;font-weight:600;color:var(--muted);
+    display:flex;align-items:center;gap:8px;
+  }
+  .pnum b{color:var(--ink);font-size:18px}
+  .foot{position:absolute;bottom:24px;left:32px;font-size:13px;color:#93a39a;z-index:2}
+
+  .head{display:flex;align-items:center;gap:22px;position:relative;z-index:1}
+  h1{font-size:50px;font-weight:800;line-height:1.2;color:var(--ink)}
+  .lead{font-size:20px;color:var(--muted);font-weight:300;margin-top:6px}
+  .grad{
+    background:linear-gradient(90deg,#15803D,#22C55E 55%,#4ADE80);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .grad-d{ /* gradient for dark cards */
+    background:linear-gradient(90deg,#4ADE80,#bbf7d0);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+
+  /* ---------- Icon circle ---------- */
+  .ic{
+    flex:none;width:64px;height:64px;border-radius:50%;
+    display:grid;place-items:center;color:#fff;
+    background:linear-gradient(135deg,#223027,#101812);
+    box-shadow:0 0 0 5px rgba(74,222,128,.22),0 8px 18px rgba(16,24,18,.25);
+    transition:transform .3s cubic-bezier(.3,1.6,.5,1),box-shadow .3s;
+    cursor:default;
+  }
+  .ic svg{width:30px;height:30px}
+  .ic:hover{transform:scale(1.14);box-shadow:0 0 0 7px rgba(74,222,128,.35),0 10px 22px rgba(16,24,18,.3)}
+  .ic.g{background:linear-gradient(135deg,#22C55E,#15803D);box-shadow:0 0 0 5px rgba(74,222,128,.18)}
+  .ic.sm{width:52px;height:52px}.ic.sm svg{width:24px;height:24px}
+  .ic.lg{width:76px;height:76px}.ic.lg svg{width:36px;height:36px}
+
+  /* ---------- Cards ---------- */
+  .card{border-radius:22px;padding:28px;position:relative;overflow:hidden}
+  .card h3{font-size:24px;font-weight:600;line-height:1.3;margin:18px 0 8px}
+  .card p{font-size:18px;font-weight:300;line-height:1.6}
+  .card.dark{background:var(--primary);color:#E3F2E8}
+  .card.soft{background:var(--soft);color:#F0FAF3}
+  .card.light{background:var(--light);border:1px solid var(--line);color:var(--ink)}
+  .card.light p{color:#3f5046}
+  .card.dark h3,.card.soft h3{color:#fff}
+  .card .num{
+    position:absolute;top:22px;right:24px;font-size:44px;font-weight:800;line-height:1;
+    color:rgba(74,222,128,.18);
+  }
+  .card.light .num{color:rgba(21,128,61,.15)}
+
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:40px;position:relative;z-index:1}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:38px;position:relative;z-index:1}
+
+  .banner{
+    margin-top:26px;border-radius:18px;padding:18px 26px;
+    display:flex;align-items:center;gap:16px;font-size:20px;position:relative;z-index:1;
+  }
+  .banner.light{background:var(--light);border:1px dashed #a7e3bb}
+  .banner.dark{background:var(--primary);color:#fff}
+
+  /* ---------- Animation ---------- */
+  .anim{opacity:0;transform:translateY(34px)}
+  .slide.active .anim{
+    animation:rise .7s cubic-bezier(.2,.8,.2,1) forwards;
+    animation-delay:calc(var(--d,0) * 130ms + 80ms);
+  }
+  @keyframes rise{to{opacity:1;transform:translateY(0)}}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+  /* ---------- Slide 1 ---------- */
+  .cover{display:grid;grid-template-columns:1.35fr 1fr;gap:30px;height:100%;align-items:center;position:relative;z-index:1}
+  .kicker{display:inline-block;font-size:16px;font-weight:500;color:#15803D;background:var(--light);border:1px solid var(--line);padding:6px 16px;border-radius:999px}
+  .cover h1{font-size:76px;line-height:1.15;margin:18px 0 12px}
+  .cover .lead{font-size:23px}
+  .presenter{display:flex;align-items:center;gap:18px;margin-top:34px;padding:20px 24px}
+  .presenter .name{font-size:22px;font-weight:600;color:#fff}
+  .presenter .school{font-size:16px;font-weight:300;color:#b9d6c3;margin-top:2px}
+  .visual{position:relative;height:440px}
+  .orb{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:250px;height:250px;border-radius:50%;
+    background:linear-gradient(145deg,#223027,#101812);
+    display:grid;place-items:center;color:#fff;
+    box-shadow:0 0 0 14px rgba(74,222,128,.12),0 0 0 30px rgba(74,222,128,.06),0 30px 60px rgba(16,24,18,.35);
+  }
+  .orb svg{width:120px;height:120px;stroke:var(--accent)}
+  .chip{
+    position:absolute;display:flex;align-items:center;gap:12px;
+    background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px 16px 10px 10px;
+    box-shadow:0 10px 24px rgba(16,24,18,.12);font-weight:500;font-size:17px;
+  }
+  .chip .in{animation:floaty 4s ease-in-out infinite}
+  .c1{top:10px;left:10px}.c2{top:60px;right:0}.c3{bottom:20px;left:60px}
+
+  /* ---------- Slide 4 (VS) ---------- */
+  .vs-wrap{position:relative}
+  .vs{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;
+    width:70px;height:70px;border-radius:50%;background:var(--accent);color:var(--primary);
+    display:grid;place-items:center;font-weight:800;font-size:22px;
+    box-shadow:0 0 0 8px #fff;
+  }
+  .big .label{font-size:15px;font-weight:500;letter-spacing:1px;color:var(--accent);text-transform:uppercase}
+  .big h3{font-size:32px;margin:14px 0 14px}
+  .row{display:flex;gap:12px;align-items:flex-start;margin-top:12px;font-size:18px;font-weight:300;line-height:1.55}
+  .row::before{content:"";flex:none;width:10px;height:10px;border-radius:50%;background:var(--accent);margin-top:9px}
+
+  /* ---------- Slide 5 (Flow) ---------- */
+  .flow{display:grid;grid-template-columns:1fr 36px 1fr 36px 1fr 36px 1fr;align-items:stretch;gap:10px;margin-top:40px;position:relative;z-index:1}
+  .flow .card{padding:24px 22px;text-align:left}
+  .flow .card h3{font-size:22px;margin:16px 0 6px}
+  .flow .card p{font-size:16.5px}
+  .step{font-size:14px;font-weight:600;color:var(--accent);letter-spacing:1px}
+  .arrow{display:grid;place-items:center;color:#22C55E}
+  .arrow svg{width:30px;height:30px}
+
+  /* ---------- Slide 8 (Stat) ---------- */
+  .statgrid{display:grid;grid-template-columns:1.15fr 1fr;gap:26px;margin-top:38px;position:relative;z-index:1}
+  .stat{display:flex;flex-direction:column;justify-content:center;padding:38px}
+  .stat .big-num{font-size:120px;font-weight:800;line-height:1}
+  .stat .cap{font-size:22px;color:#cfe7d7;margin-top:12px;font-weight:300}
+  .bar{height:14px;border-radius:99px;background:#2b3b31;margin-top:26px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#15803D,#4ADE80)}
+  .slide.active .bar i{animation:fill 1.6s .6s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes fill{to{width:93.8%}}
+  .side{display:flex;flex-direction:column;gap:22px}
+  .side .card{display:flex;gap:18px;align-items:flex-start;padding:24px}
+  .side .card h3{margin:2px 0 6px;font-size:22px}
+  .side .card p{font-size:17px}
+  .src{font-size:13px;color:#8a9a90;margin-top:16px;position:relative;z-index:1}
+
+  /* ---------- Slide 10 ---------- */
+  .thanks{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px 30px;margin-top:28px}
+  .thanks .t{font-size:34px;font-weight:700;color:#fff}
+  .thanks .s{font-size:17px;color:#b9d6c3;font-weight:300}
+
+  /* ---------- Controls ---------- */
+  .progress{position:fixed;top:0;left:0;height:4px;background:var(--accent);width:0;transition:width .4s ease;z-index:10;box-shadow:0 0 12px rgba(74,222,128,.6)}
+  .controls{
+    position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:12px;z-index:10;
+    background:rgba(34,48,39,.85);backdrop-filter:blur(8px);
+    padding:6px 8px;border-radius:999px;border:1px solid rgba(74,222,128,.2);
+  }
+  .controls button{
+    width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;
+    background:transparent;color:#d9f2e1;display:grid;place-items:center;transition:background .2s,color .2s;
+  }
+  .controls button:hover{background:var(--accent);color:var(--primary)}
+  .controls button svg{width:20px;height:20px}
+  .controls .count{color:#d9f2e1;font-size:15px;min-width:64px;text-align:center;font-weight:500}
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<div class="stage" id="stage">
+
+  <!-- 1 : Cover -->
+  <section class="slide">
+    <div class="tag">บทนำ</div>
+    <div class="cover">
+      <div>
+        <span class="kicker anim">เรื่องเล่า AI ฉบับ ม.ปลาย</span>
+        <h1 class="anim">Memory <span class="grad">Oracle</span><br>คืออะไร?</h1>
+        <p class="lead anim">เมื่อ AI เริ่ม "จำ" เราได้ — มาทำความรู้จักกันแบบง่ายๆ</p>
+        <div class="card dark presenter anim">
+          <span class="ic g" data-i="user"></span>
+          <div>
+            <div class="name">นำเสนอโดย นายก่อเกียรติ วิริยะสมบัติ</div>
+            <div class="school">ครู โรงเรียนสะเดาขรรค์ชัยกัมพลานนท์อนุสรณ์</div>
+          </div>
+        </div>
+      </div>
+      <div class="visual">
+        <div class="orb anim"><span data-i="brain" style="display:grid"></span></div>
+        <div class="chip c1 anim"><span class="ic sm in" data-i="database"></span>เก็บความจำ</div>
+        <div class="chip c2 anim"><span class="ic sm g in" data-i="search"></span>ค้นจากความหมาย</div>
+        <div class="chip c3 anim"><span class="ic sm in" data-i="shield"></span>ปลอดภัย ตรวจสอบได้</div>
+      </div>
+    </div>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 2 : Problem -->
+  <section class="slide">
+    <div class="tag">ปัญหา</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="help"></span>
+      <div>
+        <h1>ทำไม AI ถึง<span class="grad">ขี้ลืม</span>?</h1>
+        <p class="lead">ลองนึกภาพตามนะ ใครเคยเจอแบบนี้บ้าง</p>
+      </div>
+    </div>
+    <div class="grid3">
+      <div class="card dark anim"><span class="num">01</span>
+        <span class="ic g" data-i="rotate"></span>
+        <h3>จบแชต = ลืมหมด</h3>
+        <p>AI หลายตัวจำได้แค่ในบทสนทนาเดียว ปิดแชตปุ๊บ เริ่มใหม่จากศูนย์</p>
+      </div>
+      <div class="card soft anim"><span class="num">02</span>
+        <span class="ic g" data-i="message"></span>
+        <h3>ต้องเล่าซ้ำทุกรอบ</h3>
+        <p>ชื่ออะไร เรียนสายไหน ชอบอะไร… ต้องพิมพ์บอกใหม่ทุกครั้ง เหนื่อยนะ!</p>
+      </div>
+      <div class="card light anim"><span class="num">03</span>
+        <span class="ic" data-i="user"></span>
+        <h3>เหมือนเพื่อนที่จำเราไม่ได้</h3>
+        <p>คุยกันทุกวัน แต่วันรุ่งขึ้นทักว่า "เอ่อ…เธอชื่ออะไรนะ?"</p>
+      </div>
+    </div>
+    <div class="banner light anim">
+      <span class="ic sm g" data-i="book"></span>
+      <span>แล้วถ้า AI มี <b>"สมุดบันทึกความจำ"</b> เป็นของตัวเองล่ะ จะเป็นยังไง?</span>
+    </div>
+    <div class="foot">Memory Oracle คืออะไร? • ครูก่อเกียรติ</div>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 3 : Definition -->
+  <section class="slide">
+    <div class="tag">นิยาม</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="brain"></span>
+      <div>
+        <h1>Memory Oracle <span class="grad">คืออะไร?</span></h1>
+        <p class="lead">ชื่อเต็มคือ Oracle AI Agent Memory</p>
+      </div>
+    </div>
+    <div class="grid2" style="grid-template-columns:1.1fr 1fr">
+      <div class="card dark anim" style="display:flex;flex-direction:column;justify-content:center;padding:40px">
+        <span class="ic g lg" data-i="sparkles"></span>
+        <h3 style="font-size:30px;margin-top:22px">"สมุดความจำ" <span class="grad-d">ของ AI</span></h3>
+        <p style="font-size:20px">ชุดเครื่องมือ (Python library) จากบริษัท Oracle ที่ช่วยให้ AI Agent มี <b style="color:#4ADE80;font-weight:500">ความจำถาวร</b> จำบริบทข้ามบทสนทนาได้</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="card light anim" style="display:flex;gap:18px;align-items:center;padding:22px">
+          <span class="ic" data-i="bot"></span>
+          <div><h3 style="margin:0 0 4px;font-size:22px">สร้างมาเพื่อ AI Agent</h3><p style="font-size:17px">AI ที่ลงมือทำงานแทนเราได้ ไม่ใช่แค่ตอบแชต</p></div>
+        </div>
+        <div class="card soft anim" style="display:flex;gap:18px;align-items:center;padding:22px">
+          <span class="ic g" data-i="database"></span>
+          <div><h3 style="margin:0 0 4px;font-size:22px">ทำงานบน Oracle AI Database</h3><p style="font-size:17px">เก็บความจำไว้ในฐานข้อมูลอย่างเป็นระบบ</p></div>
+        </div>
+        <div class="card light anim" style="display:flex;gap:18px;align-items:center;padding:22px">
+          <span class="ic" data-i="chart"></span>
+          <div><h3 style="margin:0 0 4px;font-size:22px">จำ → เรียนรู้ → เก่งขึ้น</h3><p style="font-size:17px">เก็บบริบท เรียนรู้จากผลลัพธ์ แล้วพัฒนาขึ้นเรื่อยๆ</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="foot">Memory Oracle คืออะไร? • ครูก่อเกียรติ</div>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 4 : Short vs Long -->
+  <section class="slide">
+    <div class="tag">เปรียบเทียบ</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="layers"></span>
+      <div>
+        <h1>ความจำ<span class="grad">ระยะสั้น vs ระยะยาว</span></h1>
+        <p class="lead">เหมือนสมองคนเราเลย มี 2 ชั้นทำงานร่วมกัน</p>
+      </div>
+    </div>
+    <div class="vs-wrap">
+      <div class="grid2">
+        <div class="card soft big anim" style="padding:34px 36px">
+          <span class="ic g lg" data-i="clock"></span>
+          <h3><span class="label">Short-term</span><br>ความจำระยะสั้น</h3>
+          <div class="row">เก็บเธรดการคุย พร้อม "สรุปย่อ" และ "การ์ดบริบท"</div>
+          <div class="row">เหมือนโน้ตย่อที่จดระหว่างเรียนคาบนี้</div>
+        </div>
+        <div class="card dark big anim" style="padding:34px 36px 34px 56px">
+          <span class="ic g lg" data-i="archive"></span>
+          <h3><span class="label">Long-term</span><br>ความจำระยะยาว</h3>
+          <div class="row">ความจำถาวร ค้นหาด้วย Vector Search</div>
+          <div class="row">เหมือนสมุดสรุปทั้งเทอม เปิดดูเมื่อไหร่ก็ได้</div>
+        </div>
+      </div>
+      <div class="vs anim">VS</div>
+    </div>
+    <div class="foot">Memory Oracle คืออะไร? • ครูก่อเกียรติ</div>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 5 : How it works -->
+  <section class="slide">
+    <div class="tag">กลไก</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="zap"></span>
+      <div>
+        <h1>ทำงาน<span class="grad">อย่างไร?</span></h1>
+        <p class="lead">4 ขั้นตอนง่ายๆ ตั้งแต่คุยจนถึง "นึกออก"</p>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="card dark anim"><div class="step">STEP 1</div><span class="ic g sm" data-i="message" style="margin-top:12px"></span><h3>คุยกัน</h3><p>เราพิมพ์คุยกับ AI ตามปกติ</p></div>
+      <div class="arrow anim"><span data-i="arrow" style="display:grid"></span></div>
+      <div class="card soft anim"><div class="step">STEP 2</div><span class="ic g sm" data-i="sparkles" style="margin-top:12px"></span><h3>คัดเรื่องสำคัญ</h3><p>LLM ดึงเรื่องควรจำออกมาให้เอง อัตโนมัติ</p></div>
+      <div class="arrow anim"><span data-i="arrow" style="display:grid"></span></div>
+      <div class="card dark anim"><div class="step">STEP 3</div><span class="ic g sm" data-i="database" style="margin-top:12px"></span><h3>จัดเก็บ</h3><p>บันทึกลงฐานข้อมูลอย่างเป็นระเบียบ</p></div>
+      <div class="arrow anim"><span data-i="arrow" style="display:grid"></span></div>
+      <div class="card soft anim"><div class="step">STEP 4</div><span class="ic g sm" data-i="search" style="margin-top:12px"></span><h3>ดึงมาใช้</h3><p>ค้นความจำที่เกี่ยวข้องมาช่วยตอบ</p></div>
+    </div>
+    <div class="banner light anim">
+      <span class="ic sm g" data-i="brain"></span>
+      <span>สรุปง่ายๆ: <b>ฟัง → จด → เก็บ → นึกออก</b> คล้ายกับที่สมองเราทำทุกวันเลย!</span>
+    </div>
+    <div class="foot">Memory Oracle คืออะไร? • ครูก่อเกียรติ</div>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 6 : Vector search -->
+  <section class="slide">
+    <div class="tag">เจาะลึก</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="search"></span>
+      <div>
+        <h1>Vector Search: <span class="grad">ค้นจากความหมาย</span></h1>
+        <p class="lead">เคล็ดลับที่ทำให้ AI "นึกออก" แม้เราจะพูดไม่ตรงคำ</p>
+      </div>
+    </div>
+    <div class="grid3">
+      <div class="card light anim"><span class="num">01</span>
+        <span class="ic" data-i="layers"></span>
+        <h3>แปลงคำเป็นตัวเลข</h3>
+        <p>ข้อความถูกแปลงเป็นชุดตัวเลข (เวกเตอร์) ที่แทน "ความหมาย"</p>
+      </div>
+      <div class="card soft anim"><span class="num">02</span>
+        <span class="ic g" data-i="target"></span>
+        <h3>ความหมายใกล้ = อยู่ใกล้กัน</h3>
+        <p>ประโยคที่หมายถึงเรื่องเดียวกัน จะอยู่ใกล้กันในโลกของตัวเลข</p>
+      </div>
+      <div class="card dark anim"><span class="num">03</span>
+        <span class="ic g" data-i="message"></span>
+        <h3>ตัวอย่างจริง</h3>
+        <p>ถามว่า <span style="color:#4ADE80">"อาหารที่ฉันแพ้"</span> → AI เจอความจำ <span style="color:#4ADE80">"ห้ามกินกุ้ง"</span> ได้ทันที</p>
+      </div>
+    </div>
+    <div class="foot">Memory Oracle คืออะไร? • ครูก่อเกียรติ</div>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 7 : Governance -->
+  <section class="slide">
+    <div class="tag">ความปลอดภัย</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="shield"></span>
+      <div>
+        <h1>จำเก่งได้ แต่ต้อง<span class="grad">ปลอดภัย</span></h1>
+        <p class="lead">ความจำของ AI ต้องมี "กฎ" ควบคุม ไม่ใช่จำมั่วๆ</p>
+      </div>
+    </div>
+    <div class="grid3">
+      <div class="card dark anim"><span class="num">01</span>
+        <span class="ic g" data-i="lock"></span>
+        <h3>แยกความจำแต่ละคน</h3>
+        <p>ความจำของผู้ใช้หรือองค์กรหนึ่ง ไม่ปนกับของอีกที่</p>
+      </div>
+      <div class="card light anim"><span class="num">02</span>
+        <span class="ic" data-i="eye"></span>
+        <h3>ตรวจสอบได้</h3>
+        <p>เปิดดูได้ว่า AI จำอะไรไว้บ้าง ไม่ใช่กล่องดำ</p>
+      </div>
+      <div class="card soft anim"><span class="num">03</span>
+        <span class="ic g" data-i="rotate"></span>
+        <h3>จัดการวงจรชีวิต</h3>
+        <p>กำหนดได้ว่าจะเก็บ แก้ไข หรือลบความจำเมื่อไหร่</p>
+      </div>
+    </div>
+    <div class="foot">Memory Oracle คืออะไร? • ครูก่อเกียรติ</div>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 8 : Results -->
+  <section class="slide">
+    <div class="tag">ผลลัพธ์</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="chart"></span>
+      <div>
+        <h1>ผลทดสอบ<span class="grad">ที่น่าทึ่ง</span></h1>
+        <p class="lead">จำได้จริงไหม? ลองดูตัวเลขกัน</p>
+      </div>
+    </div>
+    <div class="statgrid">
+      <div class="card dark stat anim">
+        <div class="big-num grad-d">93.8%</div>
+        <div class="cap">ความแม่นยำบน <b style="color:#fff;font-weight:500">LongMemEval</b><br>แบบทดสอบความจำระยะยาวของ AI</div>
+        <div class="bar"><i></i></div>
+      </div>
+      <div class="side">
+        <div class="card light anim">
+          <span class="ic" data-i="layers"></span>
+          <div><h3>คุยยาวแค่ไหน ก็ไม่บวม</h3><p>ขนาดข้อความที่ส่งให้ AI แทบคงที่ เพราะใช้การสรุปและคัดความจำ</p></div>
+        </div>
+        <div class="card soft anim">
+          <span class="ic g" data-i="zap"></span>
+          <div><h3>ดึงข้อมูลได้ไว</h3><p>ออกแบบมาให้ค้นความจำได้เร็ว (low latency)</p></div>
+        </div>
+      </div>
+    </div>
+    <p class="src anim">ที่มา: Oracle Developers (2026) — ตัวเลขที่ผู้พัฒนารายงาน</p>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 9 : Relevance -->
+  <section class="slide">
+    <div class="tag">ใกล้ตัวเรา</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="school"></span>
+      <div>
+        <h1>แล้วเกี่ยวอะไร<span class="grad">กับเรา?</span></h1>
+        <p class="lead">AI ที่จำได้ กำลังจะอยู่รอบตัวเราเร็วๆ นี้</p>
+      </div>
+    </div>
+    <div class="grid3">
+      <div class="card soft anim"><span class="num">01</span>
+        <span class="ic g" data-i="book"></span>
+        <h3>ติวเตอร์ที่รู้ใจ</h3>
+        <p>AI จำได้ว่าเราอ่อนเรื่องไหน แล้วช่วยติวตรงจุด</p>
+      </div>
+      <div class="card light anim"><span class="num">02</span>
+        <span class="ic" data-i="lock"></span>
+        <h3>คิดก่อนแชร์</h3>
+        <p>AI จำได้ = ข้อมูลส่วนตัวก็ถูกจำด้วย ระวังสิ่งที่พิมพ์นะ</p>
+      </div>
+      <div class="card dark anim"><span class="num">03</span>
+        <span class="ic g" data-i="code"></span>
+        <h3>ทักษะแห่งอนาคต</h3>
+        <p>Python + Database + AI เริ่มฝึกได้ตั้งแต่ ม.ปลาย</p>
+      </div>
+    </div>
+    <div class="foot">Memory Oracle คืออะไร? • ครูก่อเกียรติ</div>
+    <div class="pnum"></div>
+  </section>
+
+  <!-- 10 : Summary -->
+  <section class="slide">
+    <div class="tag">สรุป</div>
+    <div class="head anim">
+      <span class="ic lg" data-i="target"></span>
+      <div>
+        <h1>สรุป<span class="grad">สั้นๆ</span> จำง่าย</h1>
+        <p class="lead">3 ข้อที่อยากให้ติดตัวกลับบ้าน</p>
+      </div>
+    </div>
+    <div class="grid3" style="margin-top:32px">
+      <div class="card light anim"><span class="num">01</span>
+        <span class="ic" data-i="brain"></span>
+        <h3>ความจำถาวรของ AI</h3>
+        <p>Memory Oracle ช่วยให้ AI Agent จำเราได้ข้ามบทสนทนา</p>
+      </div>
+      <div class="card light anim"><span class="num">02</span>
+        <span class="ic" data-i="search"></span>
+        <h3>สั้น + ยาว + ค้นจากความหมาย</h3>
+        <p>มีทั้งโน้ตย่อและสมุดถาวร ค้นด้วย Vector Search</p>
+      </div>
+      <div class="card light anim"><span class="num">03</span>
+        <span class="ic" data-i="shield"></span>
+        <h3>จำเก่ง แต่ต้องปลอดภัย</h3>
+        <p>แยกข้อมูล ตรวจสอบได้ และลบได้เมื่อต้องการ</p>
+      </div>
+    </div>
+    <div class="card dark thanks anim">
+      <div>
+        <div class="t">ขอบคุณครับ! <span class="grad-d">มีคำถามไหม?</span></div>
+        <div class="s">ครูก่อเกียรติ วิริยะสมบัติ • โรงเรียนสะเดาขรรค์ชัยกัมพลานนท์อนุสรณ์</div>
+      </div>
+      <span class="ic g lg" data-i="help"></span>
+    </div>
+    <div class="pnum"></div>
+  </section>
+
+</div>
+
+<div class="controls">
+  <button id="prev" title="ก่อนหน้า (←)"><span data-i="left" style="display:grid"></span></button>
+  <span class="count" id="count">1 / 10</span>
+  <button id="next" title="ถัดไป (→)"><span data-i="arrow" style="display:grid"></span></button>
+  <button id="fs" title="เต็มจอ (F)"><span data-i="expand" style="display:grid"></span></button>
+</div>
+
+<script>
+  /* ---------- Icon set (line icons) ---------- */
+  const ICONS = {
+    brain:'<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/><path d="M9 13a4.5 4.5 0 0 0 3-4"/><path d="M15 13a4.5 4.5 0 0 1-3-4"/>',
+    message:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/>',
+    database:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+    search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+    lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    archive:'<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+    sparkles:'<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/><path d="M19 3v4M17 5h4"/>',
+    bot:'<rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01M16 16h.01"/>',
+    user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    chart:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
+    target:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
+    code:'<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+    eye:'<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    help:'<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    layers:'<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
+    zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
+    school:'<path d="M22 10 12 5 2 10l10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
+    rotate:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+    arrow:'<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+    left:'<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>',
+    expand:'<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>'
+  };
+  document.querySelectorAll('[data-i]').forEach(el=>{
+    el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[el.dataset.i]||''}</svg>`;
+  });
+
+  /* ---------- Slides setup ---------- */
+  const slides = [...document.querySelectorAll('.slide')];
+  const total = slides.length;
+  slides.forEach((s,i)=>{
+    s.querySelectorAll('.anim').forEach((a,j)=>a.style.setProperty('--d',j));
+    s.querySelector('.pnum').innerHTML = `<b>${String(i+1).padStart(2,'0')}</b> / ${String(total).padStart(2,'0')}`;
+  });
+
+  let cur = 0;
+  function go(n){
+    n = Math.max(0, Math.min(total-1, n));
+    slides[cur].classList.remove('active');
+    void slides[n].offsetWidth; // restart animation
+    slides[n].classList.add('active');
+    cur = n;
+    document.getElementById('count').textContent = `${cur+1} / ${total}`;
+    document.getElementById('progress').style.width = ((cur+1)/total*100)+'%';
+    history.replaceState(null,'','#'+(cur+1));
+  }
+
+  /* ---------- Responsive scale (16:9) ---------- */
+  function fit(){
+    const s = Math.min((innerWidth-40)/1280, (innerHeight-90)/720);
+    document.getElementById('stage').style.setProperty('--s', Math.max(s,0.2));
+  }
+  addEventListener('resize', fit); fit();
+
+  /* ---------- Controls ---------- */
+  document.getElementById('next').onclick = ()=>go(cur+1);
+  document.getElementById('prev').onclick = ()=>go(cur-1);
+  document.getElementById('fs').onclick = toggleFS;
+  function toggleFS(){
+    if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  }
+  addEventListener('keydown', e=>{
+    if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();go(cur+1);}
+    else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();go(cur-1);}
+    else if(e.key==='Home') go(0);
+    else if(e.key==='End') go(total-1);
+    else if(e.key.toLowerCase()==='f') toggleFS();
+  });
+  let tx=null;
+  addEventListener('touchstart', e=>tx=e.touches[0].clientX, {passive:true});
+  addEventListener('touchend', e=>{
+    if(tx===null) return;
+    const dx = e.changedTouches[0].clientX - tx;
+    if(Math.abs(dx)>50) go(cur + (dx<0?1:-1));
+    tx=null;
+  });
+
+  const start = parseInt(location.hash.slice(1)) - 1;
+  go(isNaN(start)?0:start);
+</script>
+</body>
+</html>
